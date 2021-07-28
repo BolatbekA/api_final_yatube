@@ -1,11 +1,14 @@
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, mixins, permissions, filters
+from rest_framework import filters, mixins, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 
-from api.serializers import PostSerializer, CommentSerializer
-from api.serializers import GroupSerializer, FollowSerializer
-from posts.models import Post, Group, Follow
 from .permissions import AuthorOrReadOnly
+from api.serializers import (CommentSerializer, FollowSerializer,
+                             GroupSerializer, PostSerializer)
+from posts.models import Follow, Group, Post
+
+User = get_user_model()
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -46,28 +49,12 @@ class FollowViewSet(viewsets.ModelViewSet):
     queryset = Follow.objects.all()
     serializer_class = FollowSerializer
     permission_classes = (permissions.IsAuthenticated,)
-    filter_backends = (filters.SearchFilter)
+    filter_backends = (filters.SearchFilter, )
     search_fields = ('user__username', 'following__username',)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
     def get_queryset(self):
-        return self.request.user.following.all()
-
-
-#     def create(self, request):
-#         serializer = FollowSerializer(data=request.data)
-#         user = self.request.user
-#         follow_obj = serializer.initial_data.get('following')
-#         if user.username == follow_obj:
-#             raise PermissionDenied('Невозможно подписаться на самого себя')
-#         elif Follow.objects.filter(
-#             user=user,
-#             following=User.objects.get(username=follow_obj)
-#         ).exists():
-#             raise PermissionDenied('Вы уже подписаны')
-#         elif serializer.is_valid():
-#             serializer.save(user=user)
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = get_object_or_404(User, username=self.request.user.username)
+        return Follow.objects.filter(user=user).all()
